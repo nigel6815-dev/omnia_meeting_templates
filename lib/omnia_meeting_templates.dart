@@ -10,3 +10,5 @@ export 'src/gemini_prompt_builder.dart';
 export 'src/system_templates.dart';
 export 'src/template_renderer.dart';
 export 'src/template_sync_service.dart';
+export 'src/template_picker_sheet.dart';
+export 'src/custom_template_editor_sheet.dart';
