@@ -619,6 +619,511 @@ class _Pill extends StatelessWidget {
 }
 
 // =============================================================================
+// Specialised sections — each tied to a specific template's needs.
+// Session 2 of the templating overhaul. These are the "moat" vs Granola:
+// templates aren't just framing strings, they're compositions of sections,
+// and specialised sections render their data with their own visual style.
+// =============================================================================
+
+class BantSection extends TemplateSection {
+  const BantSection();
+  @override
+  String get id => 'bant';
+  @override
+  String get displayName => 'BANT qualification';
+  @override
+  String get description =>
+      'Sales: Budget, Authority, Need, Timeline.';
+  @override
+  String? get icon => 'attach_money';
+  @override
+  String get promptInstruction => '''
+Extract sales-call qualification signals using BANT. Each field one
+sentence at most. If something wasn't discussed, write
+"Not specified".
+- budget: stated or implied spend ceiling, or "Not specified".
+- authority: who can sign off the deal (name / role).
+- need: the actual problem the prospect is trying to solve.
+- timeline: when they need a solution by — quote dates if given.''';
+  @override
+  String get jsonSchemaSnippet => '''
+{ "budget": "", "authority": "", "need": "", "timeline": "" }''';
+  @override
+  Widget buildRenderer(BuildContext context, dynamic data) {
+    final m = data is Map ? Map<String, dynamic>.from(data) : const <String, dynamic>{};
+    if (m.isEmpty) return const _NotDiscussed();
+    final rows = <(String, IconData, String)>[
+      ('Budget', Icons.payments_outlined, (m['budget'] ?? '').toString()),
+      ('Authority', Icons.verified_user_outlined, (m['authority'] ?? '').toString()),
+      ('Need', Icons.flag_outlined, (m['need'] ?? '').toString()),
+      ('Timeline', Icons.event_outlined, (m['timeline'] ?? '').toString()),
+    ].where((e) => e.$3.trim().isNotEmpty && e.$3 != 'Not specified').toList();
+    if (rows.isEmpty) return const _NotDiscussed();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final r in rows)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Icon(r.$2, size: 16, color: const Color(0xFF6E63B6)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(r.$1,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF6E63B6))),
+                    Text(r.$3,
+                        style:
+                            const TextStyle(fontSize: 13, height: 1.4)),
+                  ],
+                ),
+              ),
+            ]),
+          ),
+      ],
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+
+class YesterdayTodayBlockersSection extends TemplateSection {
+  const YesterdayTodayBlockersSection();
+  @override
+  String get id => 'yesterday_today_blockers';
+  @override
+  String get displayName => 'Yesterday / Today / Blockers';
+  @override
+  String get description =>
+      'Standup: per-person updates with three columns.';
+  @override
+  String? get icon => 'schedule';
+  @override
+  String get promptInstruction => '''
+Group the standup into per-person updates. For each speaker:
+- person: name (or speaker label like "Speaker 1" if unnamed).
+- yesterday: 1-2 short bullets of what they said about
+  yesterday's work. Empty list if nothing said.
+- today: 1-2 short bullets about today's plan. Empty list if
+  nothing said.
+- blockers: 0-2 short bullets about anything blocking them.
+Skip a person entirely if they didn't speak.''';
+  @override
+  String get jsonSchemaSnippet => '''
+[
+  { "person": "", "yesterday": [""], "today": [""], "blockers": [""] }
+]''';
+  @override
+  Widget buildRenderer(BuildContext context, dynamic data) {
+    final items = data is List ? data : const [];
+    if (items.isEmpty) return const _NotDiscussed();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final raw in items)
+          if (raw is Map) _StandupPerson(p: Map<String, dynamic>.from(raw)),
+      ],
+    );
+  }
+}
+
+class _StandupPerson extends StatelessWidget {
+  const _StandupPerson({required this.p});
+  final Map<String, dynamic> p;
+  @override
+  Widget build(BuildContext context) {
+    final name = (p['person'] ?? '').toString();
+    final yesterday = (p['yesterday'] is List ? p['yesterday'] : const []) as List;
+    final today = (p['today'] is List ? p['today'] : const []) as List;
+    final blockers = (p['blockers'] is List ? p['blockers'] : const []) as List;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (name.isNotEmpty)
+            Text(name,
+                style: const TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w700)),
+          _StandupGroup(label: 'Yesterday', icon: Icons.history, items: yesterday, color: const Color(0xFF7E8896)),
+          _StandupGroup(label: 'Today', icon: Icons.today, items: today, color: const Color(0xFF34C759)),
+          _StandupGroup(label: 'Blockers', icon: Icons.block, items: blockers, color: const Color(0xFFB58A00)),
+        ],
+      ),
+    );
+  }
+}
+
+class _StandupGroup extends StatelessWidget {
+  const _StandupGroup(
+      {required this.label, required this.icon, required this.items, required this.color});
+  final String label;
+  final IconData icon;
+  final List items;
+  final Color color;
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, left: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(icon, size: 12, color: color),
+            const SizedBox(width: 4),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 11,
+                    color: color,
+                    fontWeight: FontWeight.w700)),
+          ]),
+          for (final item in items)
+            Padding(
+              padding: const EdgeInsets.only(top: 2, left: 16),
+              child: Text('• ${item.toString()}',
+                  style: const TextStyle(fontSize: 13, height: 1.4)),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+
+class PullQuotesSection extends TemplateSection {
+  const PullQuotesSection();
+  @override
+  String get id => 'pull_quotes';
+  @override
+  String get displayName => 'Pull quotes';
+  @override
+  String get description =>
+      'Standout verbatim quotes with attribution.';
+  @override
+  String? get icon => 'format_quote';
+  @override
+  String get promptInstruction => '''
+Pick 3-7 standout quotes from the transcript that capture
+particularly clear, surprising, vivid, or representative moments.
+Verbatim — do not paraphrase.
+- quote: the words, in quotes.
+- speaker: who said it (name or speaker label).
+- context: 1 short phrase on why this quote matters. Empty
+  string ok.''';
+  @override
+  String get jsonSchemaSnippet => '''
+[ { "quote": "", "speaker": "", "context": "" } ]''';
+  @override
+  Widget buildRenderer(BuildContext context, dynamic data) {
+    final items = data is List ? data : const [];
+    if (items.isEmpty) return const _NotDiscussed();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final raw in items)
+          if (raw is Map) _PullQuote(q: Map<String, dynamic>.from(raw)),
+      ],
+    );
+  }
+}
+
+class _PullQuote extends StatelessWidget {
+  const _PullQuote({required this.q});
+  final Map<String, dynamic> q;
+  @override
+  Widget build(BuildContext context) {
+    final quote = (q['quote'] ?? '').toString();
+    final speaker = (q['speaker'] ?? '').toString();
+    final context_ = (q['context'] ?? '').toString();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: const BoxDecoration(
+        border: Border(left: BorderSide(width: 3, color: Color(0xFF6E63B6))),
+        color: Color(0x086E63B6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('"$quote"',
+              style: const TextStyle(
+                  fontSize: 14,
+                  height: 1.5,
+                  fontStyle: FontStyle.italic)),
+          if (speaker.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text('— $speaker',
+                  style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF7E8896),
+                      fontWeight: FontWeight.w600)),
+            ),
+          if (context_.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(context_,
+                  style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF7E8896))),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+
+class PainPointsAndGoalsSection extends TemplateSection {
+  const PainPointsAndGoalsSection();
+  @override
+  String get id => 'pain_points_and_goals';
+  @override
+  String get displayName => 'Pain points & goals';
+  @override
+  String get description =>
+      'What hurts + what they want — for discovery and 1:1s.';
+  @override
+  String? get icon => 'flag';
+  @override
+  String get promptInstruction => '''
+Two parallel lists:
+- pain_points: explicit problems / frustrations / unmet needs
+  the participant raised. Each a single sentence. Empty list if
+  none surfaced.
+- goals: what they're trying to achieve / wishing for / planning.
+  Each a single sentence. Empty list if not stated.
+Be specific — "wants to be more productive" is too vague unless
+that's literally what they said.''';
+  @override
+  String get jsonSchemaSnippet => '''
+{ "pain_points": [""], "goals": [""] }''';
+  @override
+  Widget buildRenderer(BuildContext context, dynamic data) {
+    final m = data is Map ? Map<String, dynamic>.from(data) : const <String, dynamic>{};
+    final pains = (m['pain_points'] is List ? m['pain_points'] : const []) as List;
+    final goals = (m['goals'] is List ? m['goals'] : const []) as List;
+    if (pains.isEmpty && goals.isEmpty) return const _NotDiscussed();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (pains.isNotEmpty) ...[
+          const Text('Pain points',
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFFB04040))),
+          const SizedBox(height: 4),
+          for (final p in pains)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4, left: 6),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 6, right: 8),
+                  child: Icon(Icons.circle, size: 5, color: Color(0xFFB04040)),
+                ),
+                Expanded(child: Text(p.toString(), style: const TextStyle(fontSize: 13, height: 1.4))),
+              ]),
+            ),
+          const SizedBox(height: 8),
+        ],
+        if (goals.isNotEmpty) ...[
+          const Text('Goals',
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF34C759))),
+          const SizedBox(height: 4),
+          for (final g in goals)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4, left: 6),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 6, right: 8),
+                  child: Icon(Icons.circle, size: 5, color: Color(0xFF34C759)),
+                ),
+                Expanded(child: Text(g.toString(), style: const TextStyle(fontSize: 13, height: 1.4))),
+              ]),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+
+class NextStepsSection extends TemplateSection {
+  const NextStepsSection();
+  @override
+  String get id => 'next_steps';
+  @override
+  String get displayName => 'Next steps';
+  @override
+  String get description =>
+      'Forward-looking commitments — distinct from action items.';
+  @override
+  String? get icon => 'forward';
+  @override
+  String get promptInstruction => '''
+List the next-step commitments agreed by the end of the
+conversation. Distinct from action items: next steps describe
+what happens BETWEEN this meeting and the next interaction —
+e.g. "send pricing", "follow up next Tuesday", "book a demo".
+Each step:
+- step: clear single-sentence description.
+- owner: name/role of who's doing it. Empty string if it's
+  the prospect's side or unspecified.
+- when: stated timing ("next Tuesday", "by Friday", or empty
+  if not specified).''';
+  @override
+  String get jsonSchemaSnippet => '''
+[ { "step": "", "owner": "", "when": "" } ]''';
+  @override
+  Widget buildRenderer(BuildContext context, dynamic data) {
+    final items = data is List ? data : const [];
+    if (items.isEmpty) return const _NotDiscussed();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final raw in items)
+          if (raw is Map)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Icon(Icons.arrow_forward, size: 16, color: Color(0xFF6E63B6)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text((raw['step'] ?? '').toString(),
+                          style: const TextStyle(fontSize: 14, height: 1.4)),
+                      if ((raw['owner'] ?? '').toString().isNotEmpty ||
+                          (raw['when'] ?? '').toString().isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Wrap(
+                            spacing: 6,
+                            children: [
+                              if ((raw['owner'] ?? '').toString().isNotEmpty)
+                                _Pill(label: '@${raw['owner']}'),
+                              if ((raw['when'] ?? '').toString().isNotEmpty)
+                                _Pill(label: raw['when'].toString(), icon: Icons.event),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ]),
+            ),
+      ],
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+
+class RetroReflectionSection extends TemplateSection {
+  const RetroReflectionSection();
+  @override
+  String get id => 'retro_reflection';
+  @override
+  String get displayName => 'Retro reflection';
+  @override
+  String get description =>
+      'What went well, what didn\'t, what to improve.';
+  @override
+  String? get icon => 'history';
+  @override
+  String get promptInstruction => '''
+Standard sprint-retro three-part reflection. Each list 1-5 bullets,
+single sentences:
+- went_well: what worked, what to keep doing.
+- didnt_work: what slowed the team down, what frustrated people.
+- improvements: concrete experiments / changes proposed for next
+  sprint.
+If the conversation didn't address one of these explicitly, leave
+that list empty rather than inventing entries.''';
+  @override
+  String get jsonSchemaSnippet => '''
+{ "went_well": [""], "didnt_work": [""], "improvements": [""] }''';
+  @override
+  Widget buildRenderer(BuildContext context, dynamic data) {
+    final m = data is Map ? Map<String, dynamic>.from(data) : const <String, dynamic>{};
+    final wentWell = (m['went_well'] is List ? m['went_well'] : const []) as List;
+    final didnt = (m['didnt_work'] is List ? m['didnt_work'] : const []) as List;
+    final improvements = (m['improvements'] is List ? m['improvements'] : const []) as List;
+    if (wentWell.isEmpty && didnt.isEmpty && improvements.isEmpty) {
+      return const _NotDiscussed();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _RetroBlock(
+            label: 'Went well',
+            color: const Color(0xFF34C759),
+            icon: Icons.thumb_up_alt_outlined,
+            items: wentWell),
+        _RetroBlock(
+            label: 'Didn\'t work',
+            color: const Color(0xFFB04040),
+            icon: Icons.thumb_down_alt_outlined,
+            items: didnt),
+        _RetroBlock(
+            label: 'Improvements',
+            color: const Color(0xFF6E63B6),
+            icon: Icons.trending_up,
+            items: improvements),
+      ],
+    );
+  }
+}
+
+class _RetroBlock extends StatelessWidget {
+  const _RetroBlock(
+      {required this.label, required this.color, required this.icon, required this.items});
+  final String label;
+  final Color color;
+  final IconData icon;
+  final List items;
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 6),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+          ]),
+          for (final item in items)
+            Padding(
+              padding: const EdgeInsets.only(top: 2, left: 20),
+              child: Text('• ${item.toString()}',
+                  style: const TextStyle(fontSize: 13, height: 1.4)),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// =============================================================================
 // Section registry — code-defined catalogue of every built-in section.
 // User custom templates ship a list of section IDs; we resolve them through
 // this registry to get the live TemplateSection instance.
@@ -629,6 +1134,7 @@ class BuiltInSections {
 
   /// All built-in sections. Order doesn't matter — templates pick by id.
   static const List<TemplateSection> all = [
+    // Universal sections (used by Comprehensive + most other templates).
     MeetingOverviewSection(),
     DiscussionPointsSection(),
     DecisionsSection(),
@@ -639,6 +1145,13 @@ class BuiltInSections {
     SimpleSummarySection(),
     RisksSection(),
     FollowUpEmailSection(),
+    // Specialised sections (Session 2).
+    BantSection(),
+    YesterdayTodayBlockersSection(),
+    PullQuotesSection(),
+    PainPointsAndGoalsSection(),
+    NextStepsSection(),
+    RetroReflectionSection(),
   ];
 
   static final Map<String, TemplateSection> _byId = {
