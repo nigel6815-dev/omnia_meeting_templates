@@ -228,20 +228,25 @@ class _TemplateTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: selected ? scheme.primaryContainer.withValues(alpha: 0.3) : null,
-          border: Border(
-            left: BorderSide(
-              width: 3,
-              color: selected ? scheme.primary : Colors.transparent,
+    // Material wrapper is REQUIRED for InkWell to receive taps reliably
+    // when nested inside a DraggableScrollableSheet — otherwise the
+    // tap target falls back to the GestureDetector that lives on the
+    // sheet's drag handle and the on-tile tap gets eaten silently.
+    return Material(
+      color: selected ? scheme.primaryContainer.withValues(alpha: 0.3) : Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(
+                width: 3,
+                color: selected ? scheme.primary : Colors.transparent,
+              ),
             ),
           ),
-        ),
-        child: Row(
+          child: Row(
           children: [
             Icon(_iconFor(template.icon),
                 size: 20,
@@ -310,6 +315,7 @@ class _TemplateTile extends StatelessWidget {
               Icon(Icons.check_circle,
                   size: 20, color: scheme.primary),
           ],
+        ),
         ),
       ),
     );
