@@ -113,8 +113,13 @@ class _TemplatePickerSheet extends StatelessWidget {
                           template: t,
                           selected: selected?.id == t.id,
                           onTap: () {
-                            onSelected(t);
+                            // Pop FIRST so the picker is off the
+                            // navigator stack before onSelected
+                            // pushes the analysis sheet — otherwise
+                            // pop() removes the just-pushed analysis
+                            // sheet and nothing visible happens.
                             Navigator.of(context).pop();
+                            onSelected(t);
                           },
                         ),
                     const SizedBox(height: 8),
