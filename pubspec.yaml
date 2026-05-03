@@ -1,0 +1,26 @@
+name: omnia_meeting_templates
+description: >
+  Composable meeting-note templates and section renderers shared between
+  the Omnia Voice mobile app and the Omnia Voice Companion web app.
+  Each section is an independent unit (prompt + JSON schema + UI widget).
+  Templates are compositions of sections.
+version: 0.1.0
+publish_to: 'none'
+homepage: https://github.com/nigel6815-dev/omnia_meeting_templates
+
+environment:
+  sdk: ^3.11.5
+  flutter: ">=3.16.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_markdown: ^0.7.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
